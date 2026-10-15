@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "id": "reidenxerx.reserve",
+  "name": "Reserve",
+  "version": "1.0.0",
+  "author": "ReidenXerx",
+  "license": "MIT",
+  "description": "The battery screen your phone has, for your laptop: the day's level with charging and sleep marked, how much battery each app used, how long what is left will last, the battery's health over months, and a plain-words reason when it drained faster than it should. Never wakes the NVIDIA GPU to measure it; no root, no network.",
+  "kinds": [
+    "service",
+    "bar-widget",
+    "overlay"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "service": "shell/Service.qml",
+    "barWidget": "shell/BarWidget.qml",
+    "overlay": "shell/Overlay.qml"
+  },
+  "barWidget": {
+    "displayName": "Reserve",
+    "description": "Battery usage by app, health and charging, the way a phone shows them",
+    "category": "System",
+    "aliases": [
+      "reserve",
+      "battery",
+      "battery usage",
+      "battery health",
+      "power",
+      "drain"
+    ],
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {},
+    "schema": []
+  }
+}

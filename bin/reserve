@@ -1,0 +1,190 @@
+#!/usr/bin/python3 -I
+"""Reserve's helper.
+
+  reserve run       sample the battery once a minute and app activity in ten-minute buckets, until the shell that
+                    started it goes away (one sampler at a time; a second one exits at once)
+  reserve report    print everything the panel shows, as one bounded JSON answer
+                    --since today|unplug
+"""
+from __future__ import annotations
+
+import argparse
+import datetime as dt
+import json
+import os
+import pathlib
+import signal
+import sys
+import time
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "app"))
+import core  # noqa: E402
+import probe  # noqa: E402
+import store  # noqa: E402
+
+KEEP_DAYS = 30            # minutes and buckets
+KEEP_MONTHS_DAYS = 400    # hourly summaries
+INTERVAL = 60
+
+
+class Sampler:
+    def __init__(self) -> None:
+        self.prev_procs: dict = {}
+        self.prev_gpu: dict = {}
+        self.bucket_start = self._bucket_of(time.time())
+        self.bat: dict = {}
+        self.ac: dict = {}
+        self.last_t = 0.0
+        self.last_day = ""
+        self.hour_start = int(time.time()) // 3600 * 3600
+        self.hour_samples: list = []
+
+    @staticmethod
+    def _bucket_of(t: float) -> int:
+        return int(t) // core.BUCKET * core.BUCKET
+
+    def activity(self, on_ac: bool) -> None:
+        """CPU and GPU time each app used since the last look, added to the current bucket."""
+        procs = probe.processes()
+        gpu = probe.gpu_clients({pid for pid, _ in procs})
+        side = self.ac if on_ac else self.bat
+        names = {pid: name for (pid, _), (name, _) in procs.items()}
+        if self.prev_procs:
+            for key, (name, ticks) in procs.items():
+                before = self.prev_procs.get(key)
+                if before is None:
+                    continue
+                ms = (ticks - before[1]) * 1000 // probe.CLK_TCK
+                if ms > 0:
+                    entry = side.setdefault(core.clean_name(name), [0, 0])
+                    entry[0] += ms
+        if self.prev_gpu:
+            for client, (pid, ns) in gpu.items():
+                before = self.prev_gpu.get(client)
+                if before is None or ns < before[1]:
+                    continue
+                ms = (ns - before[1]) // 1_000_000
+                if ms > 0:
+                    entry = side.setdefault(core.clean_name(names.get(pid, "unknown")), [0, 0])
+                    entry[1] += ms
+        self.prev_procs, self.prev_gpu = procs, gpu
+
+    def flush_bucket(self, now: float) -> None:
+        length = int(now) - self.bucket_start
+        if length > 0 and (self.bat or self.ac):
+            top = lambda d: dict(sorted(d.items(), key=lambda kv: -(kv[1][0] + kv[1][1]))[:40])  # noqa: E731
+            store.append("apps", store.day_name(self.bucket_start),
+                         {"t": self.bucket_start, "dt": min(length, 3 * core.BUCKET), "bat": top(self.bat), "ac": top(self.ac)})
+        self.bat, self.ac = {}, {}
+        self.bucket_start = self._bucket_of(now)
+
+    def flush_hour(self) -> None:
+        samples = [core.unpack_sample(r) for r in self.hour_samples]
+        samples = [s for s in samples if s]
+        if samples:
+            store.append("hours", store.month_name(self.hour_start), {
+                "t": self.hour_start, "pct": samples[-1]["pct"],
+                "mwh": round(core.drain_mwh(samples, self.hour_start, self.hour_start + 3600), 1),
+                "bat": sum(1 for s in samples if not s["ac"]) * INTERVAL})
+        self.hour_samples = []
+
+    def daily(self, now: float, bat: dict) -> None:
+        today = dt.date.fromtimestamp(now)
+        if self.last_day == today.isoformat():
+            return
+        self.last_day = today.isoformat()
+        cap = core.health(bat).get("capacity")
+        if cap is not None:
+            store.append("health", "capacity.jsonl", {"d": self.last_day, "cap": cap, "cycles": bat.get("cycles")})
+        store.prune("samples", KEEP_DAYS, today)
+        store.prune("apps", KEEP_DAYS, today)
+        store.prune("hours", KEEP_MONTHS_DAYS, today)
+
+    def once(self) -> None:
+        now = time.time()
+        bat = probe.battery()
+        if bat is None:
+            return
+        ac = probe.on_ac()
+        row = core.pack_sample({"t": now, "pct": bat["pct"], "mw": bat["mw"], "status": bat["status"], "ac": ac,
+                                "br": probe.brightness(), "lid": probe.lid_open(), "gpu": probe.nvidia_awake(),
+                                "uah": bat["uah"], "mv": bat["mv"]})
+        store.append("samples", store.day_name(now), row)
+        if self.last_t and now - self.last_t > core.SLEEP_GAP:
+            # Back from sleep: the counters before it belong to a different stretch of time.
+            self.prev_procs, self.prev_gpu = {}, {}
+        self.activity(ac)
+        if now >= self.bucket_start + core.BUCKET:
+            self.flush_bucket(now)
+        if now >= self.hour_start + 3600:
+            self.flush_hour()
+            self.hour_start = int(now) // 3600 * 3600
+        self.hour_samples.append(row)
+        self.daily(now, bat)
+        self.last_t = now
+
+
+def run() -> int:
+    lock = store.single_instance()
+    if lock is None:
+        return 0
+    parent = os.getppid()
+    sampler = Sampler()
+    stopping = []
+
+    def stop(*_):
+        stopping.append(True)
+
+    signal.signal(signal.SIGTERM, stop)
+    signal.signal(signal.SIGINT, stop)
+    while not stopping:
+        try:
+            sampler.once()
+        except (OSError, store.Unsafe) as problem:
+            print(f"reserve: {problem}", file=sys.stderr)
+        # Gone with the shell that started it: an orphan would sample for nobody.
+        if os.getppid() != parent:
+            break
+        # Wake on the minute, so samples line up and a sleep shows as a gap.
+        delay = INTERVAL - (time.time() % INTERVAL)
+        end = time.time() + delay
+        while not stopping and time.time() < end:
+            time.sleep(min(1.0, end - time.time()))
+            if os.getppid() != parent:
+                stopping.append(True)
+    try:
+        sampler.flush_bucket(time.time())
+    except (OSError, store.Unsafe):
+        pass
+    return 0
+
+
+def report(since: str) -> int:
+    now = int(time.time())
+    names = sorted({store.day_name(now - k * 86400) for k in range(0, 4)})
+    samples, buckets = [], []
+    for name in names:
+        samples += [s for s in (core.unpack_sample(r) for r in store.read_lines("samples", name)) if s]
+        buckets += [b for b in (core.unpack_bucket(r) for r in store.read_lines("apps", name)) if b]
+    days = store.read_lines("health", "capacity.jsonl", store.HEALTH_MAX)
+    bat = probe.battery() or {}
+    out = core.report(samples, buckets, now, since, bat, days, probe.usb_pd())
+    out["ac"] = probe.on_ac()
+    print(json.dumps(out, separators=(",", ":"), ensure_ascii=True))
+    return 0
+
+
+def main(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(prog="reserve")
+    sub = parser.add_subparsers(dest="cmd", required=True)
+    sub.add_parser("run")
+    rep = sub.add_parser("report")
+    rep.add_argument("--since", choices=["today", "unplug"], default="unplug")
+    args = parser.parse_args(argv)
+    if args.cmd == "run":
+        return run()
+    return report(args.since)
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
