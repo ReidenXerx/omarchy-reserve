@@ -89,7 +89,7 @@ class Energy(unittest.TestCase):
         buckets = [{"t": T0 + 600 * k, "dt": 600, "bat": {"brave": [3000, 0], "zed": [500, 500]}, "ac": {}} for k in range(6)]
         u = core.usage_by_app(s, buckets, T0, T0 + 3600)
         names = [a["name"] for a in u["apps"]]
-        self.assertEqual(names, ["brave", "zed"])
+        self.assertEqual(names, ["Brave", "Zed"], "shown by the names people know")
         self.assertAlmostEqual(u["apps"][0]["mwh"] / u["apps"][1]["mwh"], 3.0, delta=0.01)
         total_share = sum(a["share"] for a in u["apps"]) + u["baseShare"]
         self.assertAlmostEqual(total_share, 100, delta=0.5)

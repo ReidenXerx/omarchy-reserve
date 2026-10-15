@@ -370,16 +370,22 @@ Item {
             model: {
               var u = overlay.r ? overlay.r.usage : null
               if (!u || u.totalMwh <= 0) return []
-              var rows = u.apps.slice(0, 6).map(function (a) { return { name: a.name, share: a.share, detail: Math.round(a.cpuMs / 60000) + " min of CPU" } })
-              rows.push({ name: "Screen and system", share: u.baseShare, detail: "what the laptop uses doing nothing" })
+              var rows = u.apps.slice(0, 6).map(function (a) {
+                var minutes = Math.round(a.cpuMs / 60000)
+                return { name: a.name, share: a.share, detail: (minutes > 0 ? minutes + " min" : "under a minute") + " of CPU" }
+              })
+              rows.push({ name: "Screen and system", share: u.baseShare, detail: "what the idle laptop uses" })
               return rows.sort(function (a, b) { return b.share - a.share })
             }
             delegate: RowLayout {
               required property var modelData
               Layout.fillWidth: true
               spacing: Style.space(10)
+              // A fixed column for the name, so the bar beside it gets the rest of the row.
               ColumnLayout {
                 Layout.preferredWidth: Style.space(150)
+                Layout.maximumWidth: Style.space(150)
+                Layout.fillWidth: false
                 spacing: 0
                 Text {
                   Layout.fillWidth: true

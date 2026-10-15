@@ -40,6 +40,22 @@ def unpack_sample(row) -> dict | None:
         return None
 
 
+# The kernel names a process by its executable, cut to 15 characters. These read better as the apps people know.
+DISPLAY = {"quickshell": "Omarchy shell", "Hyprland": "Hyprland", "Xwayland": "Xwayland (older apps)",
+           "brave": "Brave", "zed": "Zed", "zed-editor": "Zed", "firefox": "Firefox", "chromium": "Chromium",
+           "cs2": "Counter-Strike 2", "steamwebhelper": "Steam", "steam": "Steam", "omagram": "Omagram",
+           "pipewire": "Sound (PipeWire)", "wireplumber": "Sound (PipeWire)", "foot": "Terminal", "warp": "Warp",
+           "claude": "Claude Code", "node": "Node.js", "python3": "Python", "code": "VS Code", "obs": "OBS Studio",
+           "mpv": "mpv", "spotify": "Spotify", "telegram-deskto": "Telegram", "Discord": "Discord", "geary": "Geary"}
+
+
+def display_name(name: str) -> str:
+    """How an app is shown: its known name, or its process name with a capital first letter."""
+    if name in DISPLAY:
+        return DISPLAY[name]
+    return name[:1].upper() + name[1:] if name else name
+
+
 def clean_name(name: str) -> str:
     """An app's name as the kernel gives it (comm), made safe to show."""
     keep = "".join(ch for ch in str(name) if ch.isprintable() and ch not in "<>&\"'")
@@ -172,7 +188,9 @@ def usage_by_app(samples: list[dict], buckets: list[dict], start: int, end: int)
             base += energy - floor_part
             continue
         for name, wgt in weights.items():
-            a = apps.setdefault(name, {"name": name, "mwh": 0.0, "cpuMs": 0, "gpuMs": 0})
+            # Grouped under the name people know, so Steam's helper and Steam are one line.
+            shown = display_name(name)
+            a = apps.setdefault(shown, {"name": shown, "mwh": 0.0, "cpuMs": 0, "gpuMs": 0})
             a["mwh"] += (energy - floor_part) * wgt / weight_sum
             a["cpuMs"] += b["bat"][name][0]
             a["gpuMs"] += b["bat"][name][1]
