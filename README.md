@@ -61,6 +61,15 @@ omarchy plugin add https://github.com/ReidenXerx/omarchy-reserve.git --enable
 Then add the Reserve widget to your bar and restart the shell with
 `omarchy-restart-shell`.
 
+## Remove
+
+```bash
+omarchy plugin remove reidenxerx.reserve
+```
+
+The sampler stops with it. Your history stays in `~/.local/state/reserve` until
+you delete it.
+
 ## Requirements
 
 Omarchy's Quickshell-based shell, Python 3, and a laptop battery.
