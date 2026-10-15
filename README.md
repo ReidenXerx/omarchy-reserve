@@ -28,8 +28,9 @@ faster than it should.
 
 ## Using it
 
-Put the widget on your bar: a battery with a heart. Its tooltip has the level
-and the time left; a click opens the panel.
+Put the widget on your bar: it is a battery icon at your level, with a bolt
+while it charges, so it can stand in for the stock one. Its tooltip has the
+level and the time left; a click opens the panel.
 
 | In the panel | What it shows |
 |---|---|

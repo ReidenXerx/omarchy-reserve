@@ -21,6 +21,7 @@ Item {
   // UPower's display device reports 0 to 1.
   readonly property int percent: reserve.present ? Math.round(Math.max(0, Math.min(1, reserve.device.percentage)) * 100) : 0
   readonly property bool onBattery: UPower.onBattery === true
+  readonly property bool charging: reserve.present && reserve.device.state === UPowerDeviceState.Charging
   readonly property real timeToEmpty: reserve.present ? reserve.device.timeToEmpty : 0
   readonly property real timeToFull: reserve.present ? reserve.device.timeToFull : 0
 
