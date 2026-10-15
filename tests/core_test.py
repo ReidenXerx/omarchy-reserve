@@ -105,6 +105,24 @@ class Energy(unittest.TestCase):
         self.assertIsNone(core.time_left([sample(T0, 50, -1, "C", True)]))
 
 
+class Battery(unittest.TestCase):
+    def test_a_charger_too_small_for_the_load_still_counts_as_battery(self):
+        s = [sample(T0 + 60 * i, 80 - i * 0.1, 25_000, "D", ac=True) for i in range(31)]
+        self.assertAlmostEqual(core.drain_mwh(s, T0, T0 + 1800), 12_500, delta=1)
+        self.assertIsNotNone(core.time_left(s))
+
+    def test_shares_add_up_while_a_bucket_is_still_open(self):
+        s = [sample(T0 + 60 * i, 80, 12_000) for i in range(26)]
+        buckets = [{"t": T0, "dt": 600, "bat": {"brave": [3000, 0]}, "ac": {}}]      # 25 minutes, one bucket written
+        u = core.usage_by_app(s, buckets, T0, T0 + 1500)
+        self.assertAlmostEqual(sum(a["share"] for a in u["apps"]) + u["baseShare"], 100, delta=0.5)
+
+    def test_no_time_left_from_a_stopped_sampler(self):
+        s = minutes(T0, 30, mw=10_000)
+        self.assertIsNotNone(core.time_left(s, now_t=s[-1]["t"] + 60))
+        self.assertIsNone(core.time_left(s, now_t=s[-1]["t"] + 6 * 3600))
+
+
 class Words(unittest.TestCase):
     def test_insights_name_the_cause(self):
         s = [sample(T0 + 60 * i, 80 - i * 0.2, 25_000, gpu=True) for i in range(40)]
@@ -176,6 +194,24 @@ class Files(unittest.TestCase):
     def test_reads_have_a_ceiling(self):
         store.append("samples", "big.jsonl", ["x" * 100])
         self.assertEqual(store.read_lines("samples", "big.jsonl", ceiling=10), [])
+
+    def test_the_lock_works_without_a_runtime_directory(self):
+        old = os.environ.pop("XDG_RUNTIME_DIR", None)
+        try:
+            fd = store.single_instance()
+            self.assertIsNotNone(fd)
+            self.assertIsNone(store.single_instance(), "only one holder")
+            os.close(fd)
+        finally:
+            if old is not None:
+                os.environ["XDG_RUNTIME_DIR"] = old
+
+    def test_a_line_nested_too_deep_is_skipped(self):
+        store.append("samples", "deep.jsonl", [1])
+        path = os.path.join(self.tmp.name, "reserve", "samples", "deep.jsonl")
+        with open(path, "a") as f:
+            f.write("[" * 200000 + "\n")
+        self.assertEqual(store.read_lines("samples", "deep.jsonl"), [[1]])
 
     def test_old_files_are_pruned_by_their_date(self):
         import datetime as dt

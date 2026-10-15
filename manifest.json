@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "reidenxerx.reserve",
   "name": "Reserve",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "author": "ReidenXerx",
   "license": "MIT",
   "description": "The battery screen your phone has, for your laptop: the day's level with charging and sleep marked, how much battery each app used, how long what is left will last, the battery's health over months, and a plain-words reason when it drained faster than it should. Never wakes the NVIDIA GPU to measure it; no root, no network.",

@@ -124,6 +124,12 @@ def last_unplug(samples: list[dict]) -> dict | None:
 
 # ---------------------------------------------------------------- energy
 
+def on_battery(s: dict) -> bool:
+    """Running from the battery: its own status says it is discharging, as it does when a charger too small for the
+    load is plugged in, or it is unplugged and drawing power."""
+    return s["st"] == "D" or (not s["ac"] and s["mw"] > 0)
+
+
 def drain_mwh(samples: list[dict], start: int, end: int) -> float:
     """Energy drawn from the battery between two times (mWh): power integrated over each minute on battery.
     Minutes asleep are left out; what sleep cost is measured separately, from the charge before and after."""
@@ -132,7 +138,7 @@ def drain_mwh(samples: list[dict], start: int, end: int) -> float:
         if cur["t"] <= start or prev["t"] >= end:
             continue
         gap = cur["t"] - prev["t"]
-        if gap > SLEEP_GAP or prev["ac"] or prev["mw"] <= 0:
+        if gap > SLEEP_GAP or not on_battery(prev) or prev["mw"] <= 0:
             continue
         a, b = max(prev["t"], start), min(cur["t"], end)
         total += prev["mw"] * (b - a) / 3600
@@ -156,7 +162,7 @@ def sleep_cost(samples: list[dict]) -> list[dict]:
 def baseline_mw(samples: list[dict]) -> float:
     """The laptop's floor on battery: the 10th percentile of power with the lid open. What the screen and the idle
     system cost whatever the apps do."""
-    values = sorted(s["mw"] for s in samples if not s["ac"] and s["lid"] and s["mw"] > 0)
+    values = sorted(s["mw"] for s in samples if on_battery(s) and s["lid"] and s["mw"] > 0)
     if not values:
         return 0.0
     return float(values[int(len(values) * 0.1)])
@@ -194,6 +200,11 @@ def usage_by_app(samples: list[dict], buckets: list[dict], start: int, end: int)
             a["mwh"] += (energy - floor_part) * wgt / weight_sum
             a["cpuMs"] += b["bat"][name][0]
             a["gpuMs"] += b["bat"][name][1]
+    # Energy no finished bucket covers yet (the bucket in progress) is told as the screen and system, so the shares
+    # always add up to what was used.
+    covered = base + sum(a["mwh"] for a in apps.values())
+    if total > covered:
+        base += total - covered
     listed = sorted(apps.values(), key=lambda a: -a["mwh"])
     for a in listed:
         a["share"] = round(100 * a["mwh"] / total, 1) if total > 0 else 0
@@ -205,16 +216,19 @@ def usage_by_app(samples: list[dict], buckets: list[dict], start: int, end: int)
 def _seconds_on_battery(samples: list[dict], start: int, end: int) -> int:
     seconds = 0
     for prev, cur in zip(samples, samples[1:]):
-        if cur["t"] <= start or prev["t"] >= end or cur["t"] - prev["t"] > SLEEP_GAP or prev["ac"]:
+        if cur["t"] <= start or prev["t"] >= end or cur["t"] - prev["t"] > SLEEP_GAP or not on_battery(prev):
             continue
         seconds += min(cur["t"], end) - max(prev["t"], start)
     return seconds
 
 
-def time_left(samples: list[dict], window: int = 1200) -> dict | None:
+def time_left(samples: list[dict], window: int = 1200, now_t: float | None = None) -> dict | None:
     """Hours left at the recent rate: the average power over the last twenty minutes on battery, so one busy
-    moment does not swing it."""
-    if not samples or samples[-1]["ac"]:
+    moment does not swing it. Nothing when the last sample is old (the sampler is not running): a stale guess is
+    worse than none."""
+    if not samples or not on_battery(samples[-1]):
+        return None
+    if now_t is not None and now_t - samples[-1]["t"] > 180:
         return None
     now = samples[-1]
     energy = drain_mwh(samples, now["t"] - window, now["t"])
@@ -230,7 +244,7 @@ def gpu_on_battery(samples: list[dict], start: int, end: int) -> int:
     """Seconds the dedicated GPU was awake while on battery."""
     seconds = 0
     for prev, cur in zip(samples, samples[1:]):
-        if cur["t"] <= start or prev["t"] >= end or cur["t"] - prev["t"] > SLEEP_GAP or prev["ac"] or not prev["gpu"]:
+        if cur["t"] <= start or prev["t"] >= end or cur["t"] - prev["t"] > SLEEP_GAP or not on_battery(prev) or not prev["gpu"]:
             continue
         seconds += min(cur["t"], end) - max(prev["t"], start)
     return seconds
@@ -325,7 +339,7 @@ def report(samples: list[dict], buckets: list[dict], now: int, since: str, info:
         "chartStart": chart_start,
         "spans": {k: [x for x in v if x[1] >= chart_start] for k, v in spans(samples).items()},
         "usage": usage,
-        "timeLeft": time_left(samples),
+        "timeLeft": time_left(samples, now_t=now),
         "health": health(info),
         "trend": capacity_trend(health_days),
         "charger": charger(pd),

@@ -109,7 +109,7 @@ def read_lines(sub: str, name: str, ceiling: int = DAY_MAX) -> list:
     for line in raw.decode("utf-8", "replace").splitlines():
         try:
             out.append(json.loads(line))
-        except ValueError:
+        except (ValueError, RecursionError):       # a torn line, or one nested past what json can take
             continue
     return out
 
@@ -151,10 +151,23 @@ def prune(sub: str, keep_days: int, today: dt.date) -> int:
 
 def single_instance():
     """A lock only one sampler holds: a second one started by a shell reload exits at once."""
-    runtime = os.environ.get("XDG_RUNTIME_DIR", "")
-    if not runtime.startswith("/"):
-        runtime = state_root()
-    fd = os.open(os.path.join(runtime, "reserve.lock"), os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600)
+    flags = os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_CLOEXEC
+    try:
+        runtime = os.environ.get("XDG_RUNTIME_DIR", "")
+        if runtime.startswith("/"):
+            fd = os.open(os.path.join(runtime, "reserve.lock"), flags, 0o600)
+        else:
+            d = dir_fd()                # no runtime directory: the lock lives in the private state directory
+            try:
+                fd = os.open("sampler.lock", flags, 0o600, dir_fd=d)
+            finally:
+                os.close(d)
+    except (OSError, Unsafe):
+        return None
+    info = os.fstat(fd)
+    if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid():
+        os.close(fd)
+        return None
     try:
         fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except OSError:

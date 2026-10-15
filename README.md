@@ -15,10 +15,14 @@ faster than it should.
   smeared across the apps.
 - **It names the cause.** An NVIDIA GPU left awake on battery, a night asleep
   that drained more than it should (healthy sleep here loses well under 1% an
-  hour), one app that took most of the charge. Each comes with what to do.
-- **Measuring never costs you battery.** It never wakes the dedicated GPU to
-  ask how it is: its runtime power status is read from sysfs, never through
-  `nvidia-smi`. One sample a minute takes about 15 to 25 ms of CPU.
+  hour), one app that took most of the charge, said in plain words.
+- **Measuring costs next to nothing.** It never wakes the dedicated GPU to ask
+  how it is: its runtime power status is read from sysfs, never through
+  `nvidia-smi`. One sample a minute takes about 40 ms of CPU with a few hundred
+  processes running (it grows with how many you run).
+- **It sees a charger that is not enough.** On battery means the battery is
+  discharging, so a game that outruns a small USB-C charger is counted as the
+  drain it is, not hidden behind "plugged in".
 - **Health over months, not just today.** Capacity against the battery's
   design, cycles and temperature, with a daily capacity log so slow wear shows
   long before it bites.
@@ -48,8 +52,9 @@ CPU time and `/proc/<pid>/fdinfo` for GPU time, once a minute, and only for
 your own processes. It runs no programs. The shell starts it and it stops with
 the shell.
 
-History stays on your laptop, in `~/.local/state/reserve`, a private directory:
-30 days of minutes (about 2 MB) and a year of hourly summaries. Nothing is sent
+History stays on your laptop, in `~/.local/state/reserve`, a directory of its
+own that only you can read: 30 days of samples and app activity (about 5 MB),
+and a daily capacity reading kept for the health trend. Nothing is sent
 anywhere and nothing needs root.
 
 ## Install

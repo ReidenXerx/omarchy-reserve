@@ -232,17 +232,17 @@ Item {
             id: chart
             Layout.fillWidth: true
             Layout.preferredHeight: Style.space(120)
-            readonly property var data: overlay.r
+            readonly property var chartData: overlay.r
             readonly property color ink: overlay.ink
             readonly property color line: overlay.accent
-            onDataChanged: requestPaint()
+            onChartDataChanged: requestPaint()
             onWidthChanged: requestPaint()
             onInkChanged: requestPaint()
 
             onPaint: {
               var c = getContext("2d")
               c.reset()
-              var d = chart.data
+              var d = chart.chartData
               var left = Style.space(26), bottom = Style.space(16)
               var w = width - left, h = height - bottom
               c.font = Math.round(Style.font.caption * 0.9) + "px sans-serif"

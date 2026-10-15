@@ -56,8 +56,12 @@ Item {
   property string since: "unplug"
   property string trouble: ""
 
+  // A report asked for while one runs (a switch between Today and Since unplugged) is run right after it.
+  property bool refreshAgain: false
+
   function refresh() {
-    if (reporter.running) return
+    if (reporter.running) { reserve.refreshAgain = true; return }
+    reserve.refreshAgain = false
     reporter.command = ["/usr/bin/python3", "-I", reserve.helper, "report", "--since", reserve.since === "today" ? "today" : "unplug"]
     reporter.running = true
     deadline.restart()
@@ -72,6 +76,7 @@ Item {
     id: reporter
     clearEnvironment: true
     environment: reserve.helperEnv
+    onExited: if (reserve.refreshAgain) Qt.callLater(reserve.refresh)
     stdout: StdioCollector {
       onStreamFinished: {
         deadline.stop()

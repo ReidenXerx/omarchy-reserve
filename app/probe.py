@@ -66,9 +66,11 @@ def battery() -> dict | None:
         full = int((number(f("energy_full")) or 0) / v)
         design = int((number(f("energy_full_design")) or 0) / v)
     pct = number(f("capacity"))
+    if pct is None or not volts_uv:
+        return None                     # a failed read is no sample, not a battery at 0%
     temp = number(f("temp"))
     return {
-        "pct": float(pct if pct is not None else 0),
+        "pct": float(pct),
         "status": status,
         "mw": int(round(mw)) * (-1 if status == "Charging" else 1),
         "uah": int(uah),
@@ -148,6 +150,14 @@ def nvidia_awake() -> bool:
             if small(os.path.join(d, "power", "runtime_status")) == "active":
                 return True
     return False
+
+
+def uptime_ticks() -> int:
+    """Clock ticks since boot, the unit of a process's start time in /proc/<pid>/stat."""
+    try:
+        return int(float(small("/proc/uptime", 64).split()[0]) * CLK_TCK)
+    except (ValueError, IndexError):
+        return 0
 
 
 def processes() -> dict:

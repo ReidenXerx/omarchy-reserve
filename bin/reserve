@@ -23,7 +23,6 @@ import probe  # noqa: E402
 import store  # noqa: E402
 
 KEEP_DAYS = 30            # minutes and buckets
-KEEP_MONTHS_DAYS = 400    # hourly summaries
 INTERVAL = 60
 
 
@@ -31,29 +30,30 @@ class Sampler:
     def __init__(self) -> None:
         self.prev_procs: dict = {}
         self.prev_gpu: dict = {}
-        self.bucket_start = self._bucket_of(time.time())
+        # A bucket starts where the last one ended, never on a grid, so a restart or a sleep cannot make two
+        # buckets cover the same minutes (which would count their energy twice).
+        self.bucket_start = int(time.time())
         self.bat: dict = {}
         self.ac: dict = {}
         self.last_t = 0.0
         self.last_day = ""
-        self.hour_start = int(time.time()) // 3600 * 3600
-        self.hour_samples: list = []
+        self.prev_uptime = 0           # clock ticks since boot at the last look
 
-    @staticmethod
-    def _bucket_of(t: float) -> int:
-        return int(t) // core.BUCKET * core.BUCKET
-
-    def activity(self, on_ac: bool) -> None:
-        """CPU and GPU time each app used since the last look, added to the current bucket."""
+    def activity(self, on_battery: bool) -> None:
+        """CPU and GPU time each app used since the last look, added to the current bucket. A process that started
+        since the last look counts from its start, so a short job or a freshly launched game is not missed."""
         procs = probe.processes()
         gpu = probe.gpu_clients({pid for pid, _ in procs})
-        side = self.ac if on_ac else self.bat
+        uptime = probe.uptime_ticks()
+        side = self.bat if on_battery else self.ac
         names = {pid: name for (pid, _), (name, _) in procs.items()}
         if self.prev_procs:
             for key, (name, ticks) in procs.items():
                 before = self.prev_procs.get(key)
                 if before is None:
-                    continue
+                    if not (self.prev_uptime and key[1] > self.prev_uptime):
+                        continue
+                    before = (name, 0)
                 ms = (ticks - before[1]) * 1000 // probe.CLK_TCK
                 if ms > 0:
                     entry = side.setdefault(core.clean_name(name), [0, 0])
@@ -67,7 +67,7 @@ class Sampler:
                 if ms > 0:
                     entry = side.setdefault(core.clean_name(names.get(pid, "unknown")), [0, 0])
                     entry[1] += ms
-        self.prev_procs, self.prev_gpu = procs, gpu
+        self.prev_procs, self.prev_gpu, self.prev_uptime = procs, gpu, uptime
 
     def flush_bucket(self, now: float) -> None:
         length = int(now) - self.bucket_start
@@ -76,17 +76,7 @@ class Sampler:
             store.append("apps", store.day_name(self.bucket_start),
                          {"t": self.bucket_start, "dt": min(length, 3 * core.BUCKET), "bat": top(self.bat), "ac": top(self.ac)})
         self.bat, self.ac = {}, {}
-        self.bucket_start = self._bucket_of(now)
-
-    def flush_hour(self) -> None:
-        samples = [core.unpack_sample(r) for r in self.hour_samples]
-        samples = [s for s in samples if s]
-        if samples:
-            store.append("hours", store.month_name(self.hour_start), {
-                "t": self.hour_start, "pct": samples[-1]["pct"],
-                "mwh": round(core.drain_mwh(samples, self.hour_start, self.hour_start + 3600), 1),
-                "bat": sum(1 for s in samples if not s["ac"]) * INTERVAL})
-        self.hour_samples = []
+        self.bucket_start = int(now)
 
     def daily(self, now: float, bat: dict) -> None:
         today = dt.date.fromtimestamp(now)
@@ -94,11 +84,10 @@ class Sampler:
             return
         self.last_day = today.isoformat()
         cap = core.health(bat).get("capacity")
-        if cap is not None:
+        if cap:                         # a failed read gives no capacity, and is not logged as 0%
             store.append("health", "capacity.jsonl", {"d": self.last_day, "cap": cap, "cycles": bat.get("cycles")})
         store.prune("samples", KEEP_DAYS, today)
         store.prune("apps", KEEP_DAYS, today)
-        store.prune("hours", KEEP_MONTHS_DAYS, today)
 
     def once(self) -> None:
         now = time.time()
@@ -111,15 +100,15 @@ class Sampler:
                                 "uah": bat["uah"], "mv": bat["mv"]})
         store.append("samples", store.day_name(now), row)
         if self.last_t and now - self.last_t > core.SLEEP_GAP:
-            # Back from sleep: the counters before it belong to a different stretch of time.
-            self.prev_procs, self.prev_gpu = {}, {}
-        self.activity(ac)
+            # Back from sleep: the bucket ends where the laptop went down, and the counters before it belong to a
+            # different stretch of time.
+            self.flush_bucket(self.last_t)
+            self.bucket_start = int(now)
+            self.prev_procs, self.prev_gpu, self.prev_uptime = {}, {}, 0
+        # On battery is the battery's own word: a charger too small for the load still lets it discharge.
+        self.activity(bat["status"] == "Discharging" or (not ac and bat["mw"] > 0))
         if now >= self.bucket_start + core.BUCKET:
             self.flush_bucket(now)
-        if now >= self.hour_start + 3600:
-            self.flush_hour()
-            self.hour_start = int(now) // 3600 * 3600
-        self.hour_samples.append(row)
         self.daily(now, bat)
         self.last_t = now
 
@@ -172,7 +161,7 @@ def run() -> int:
 
 def report(since: str) -> int:
     now = int(time.time())
-    names = sorted({store.day_name(now - k * 86400) for k in range(0, 4)})
+    names = sorted({store.day_name(now - k * 86400) for k in range(0, 5)})     # five, so a short day is never missed
     samples, buckets = [], []
     for name in names:
         samples += [s for s in (core.unpack_sample(r) for r in store.read_lines("samples", name)) if s]
