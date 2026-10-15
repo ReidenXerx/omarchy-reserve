@@ -124,7 +124,18 @@ class Sampler:
         self.last_t = now
 
 
+def die_with_parent() -> None:
+    """Ask the kernel to stop this sampler when the shell that started it goes, however it goes."""
+    try:
+        import ctypes
+        libc = ctypes.CDLL(None, use_errno=True)
+        libc.prctl(1, signal.SIGTERM, 0, 0, 0)          # PR_SET_PDEATHSIG
+    except (OSError, AttributeError):
+        pass
+
+
 def run() -> int:
+    die_with_parent()
     lock = store.single_instance()
     if lock is None:
         return 0

@@ -13,6 +13,13 @@ Item {
   property var manifest: null
   readonly property string pluginId: "reidenxerx.reserve"
   readonly property string helper: String(Qt.resolvedUrl("../bin/reserve")).replace("file://", "")
+  // All the helper is given of the shell's environment: where home, state and the runtime directory are.
+  readonly property var helperEnv: ({
+    PATH: "/usr/bin",
+    HOME: Quickshell.env("HOME") || "",
+    XDG_STATE_HOME: Quickshell.env("XDG_STATE_HOME") || "",
+    XDG_RUNTIME_DIR: Quickshell.env("XDG_RUNTIME_DIR") || ""
+  })
 
   // ---------------------------------------------------------------- live, from UPower
 
@@ -30,6 +37,8 @@ Item {
   Process {
     id: sampler
     command: ["/usr/bin/python3", "-I", reserve.helper, "run"]
+    clearEnvironment: true
+    environment: reserve.helperEnv
     running: true
     onExited: function (code) { restart.start() }
   }
@@ -61,6 +70,8 @@ Item {
 
   Process {
     id: reporter
+    clearEnvironment: true
+    environment: reserve.helperEnv
     stdout: StdioCollector {
       onStreamFinished: {
         deadline.stop()

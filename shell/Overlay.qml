@@ -96,6 +96,7 @@ Item {
   }
 
   component Heading: Text {
+    textFormat: Text.PlainText
     color: Qt.rgba(Commons.Color.popups.text.r, Commons.Color.popups.text.g, Commons.Color.popups.text.b, 0.6)
     font.family: Style.font.family
     font.pixelSize: Style.font.caption
@@ -113,6 +114,7 @@ Item {
     spacing: 0
     Layout.fillWidth: true
     Text {
+      textFormat: Text.PlainText
       text: tile.label
       color: Qt.rgba(tile.ink.r, tile.ink.g, tile.ink.b, 0.6)
       font.family: Style.font.family
@@ -121,6 +123,7 @@ Item {
       font.letterSpacing: 1
     }
     Text {
+      textFormat: Text.PlainText
       text: tile.value
       color: tile.ink
       font.family: Style.font.family
@@ -193,6 +196,7 @@ Item {
             Layout.fillWidth: true
             spacing: Style.space(12)
             Text {
+              textFormat: Text.PlainText
               text: overlay.reserve ? overlay.reserve.percent + "%" : ""
               color: overlay.ink
               font.family: Style.font.family
@@ -203,6 +207,7 @@ Item {
               Layout.fillWidth: true
               spacing: 0
               Text {
+                textFormat: Text.PlainText
                 text: "Reserve"
                 color: overlay.faint
                 font.family: Style.font.family
@@ -320,6 +325,7 @@ Item {
                   color: Qt.rgba(modelData[1].r, modelData[1].g, modelData[1].b, modelData[2])
                 }
                 Text {
+                  textFormat: Text.PlainText
                   text: modelData[0]
                   color: overlay.faint
                   font.family: Style.font.family
@@ -406,6 +412,7 @@ Item {
                 }
               }
               Text {
+                textFormat: Text.PlainText
                 Layout.preferredWidth: Style.space(44)
                 horizontalAlignment: Text.AlignRight
                 text: Math.round(modelData.share) + "%"
