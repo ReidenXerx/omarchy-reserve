@@ -125,6 +125,9 @@ class Words(unittest.TestCase):
         self.assertEqual((h["capacity"], h["cycles"]), (100.9, 112))
         self.assertIsNone(core.health({})["capacity"])
         self.assertEqual(core.capacity_trend([{"d": "2026-10-16", "cap": 100.9}, {"bad": 1}]), [["2026-10-16", 100.9]])
+        # A sampler restarted three times in a day logs three lines; the trend has one point for it.
+        log = [{"d": "2026-10-16", "cap": 100.9}, {"d": "2026-10-16", "cap": 100.8}, {"d": "2026-10-15", "cap": 101.0}]
+        self.assertEqual(core.capacity_trend(log), [["2026-10-15", 101.0], ["2026-10-16", 100.8]])
 
     def test_the_report_holds_together(self):
         s = [sample(T0 + 60 * i, 80 - i * 0.05, 12_000) for i in range(120)]

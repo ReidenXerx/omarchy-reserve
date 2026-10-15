@@ -91,6 +91,35 @@ Item {
     onTriggered: reserve.refresh()
   }
 
+  // The power panel Reserve does not replace, when one is on the bar (the tray drawer counts): Dell Power's charge
+  // limits, thermal modes and fans first, else Omarchy's own power panel. Read from shell.json, since plugin
+  // services are not handed the shell's registry.
+  property string powerPlugin: ""
+
+  FileView {
+    path: (Quickshell.env("XDG_CONFIG_HOME") || (Quickshell.env("HOME") + "/.config")) + "/omarchy/shell.json"
+    watchChanges: true
+    printErrors: false
+    onFileChanged: reload()
+    onLoaded: {
+      var raw = text()
+      if (raw.length > 4 * 1024 * 1024) return
+      var config
+      try { config = JSON.parse(raw) } catch (e) { return }
+      var layout = config && config.bar && config.bar.layout ? config.bar.layout : {}
+      var onBar = {}
+      for (var section in layout) {
+        var list = Array.isArray(layout[section]) ? layout[section] : []
+        for (var i = 0; i < list.length; i++) {
+          var id = typeof list[i] === "string" ? list[i] : (list[i] && list[i].id)
+          if (typeof id === "string") onBar[id] = true
+        }
+      }
+      reserve.powerPlugin = onBar["io.github.nipsen.dell-power"] ? "io.github.nipsen.dell-power"
+                          : onBar["omarchy.power"] ? "omarchy.power" : ""
+    }
+  }
+
   property real anchorX: -1
 
   function togglePanel(x) {

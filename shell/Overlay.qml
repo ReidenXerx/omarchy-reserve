@@ -31,27 +31,10 @@ Item {
     onTriggered: overlay.findService()
   }
 
-  // The panel that holds the power controls Reserve does not: Dell Power's charge limits, thermal modes and fans
-  // when it is installed, otherwise Omarchy's own power panel. Empty when neither is enabled.
-  property string powerPlugin: ""
-
-  function findPowerPlugin() {
-    var registry = overlay.shell ? overlay.shell.pluginRegistry : null
-    var candidates = ["io.github.nipsen.dell-power", "omarchy.power"]
-    for (var i = 0; i < candidates.length; i++)
-      if (registry && typeof registry.isEnabled === "function" && registry.isEnabled(candidates[i])) return candidates[i]
-    return ""
-  }
-
-  function openPowerControls() {
-    var id = overlay.powerPlugin
-    overlay.dismiss()
-    if (id && overlay.shell && typeof overlay.shell.toggle === "function") overlay.shell.toggle(id, "{}")
-  }
+  readonly property string powerPlugin: overlay.reserve ? overlay.reserve.powerPlugin : ""
 
   function open(payloadJson) {
     overlay.findService()
-    overlay.powerPlugin = overlay.findPowerPlugin()
     overlay.opened = true
     if (overlay.reserve) {
       overlay.reserve.panelOpen = true
@@ -516,13 +499,18 @@ Item {
             font.pixelSize: Style.font.caption
           }
 
-          Button {
+          // The shell lets a plugin open only its own panels, so this says where the other controls live.
+          Text {
+            Layout.fillWidth: true
             visible: overlay.powerPlugin !== ""
-            text: overlay.powerPlugin === "io.github.nipsen.dell-power" ? "Charge limit, thermal modes and fans" : "Power profile and battery settings"
-            bordered: true
-            foreground: overlay.ink
-            accent: overlay.accent
-            onClicked: overlay.openPowerControls()
+            textFormat: Text.PlainText
+            wrapMode: Text.Wrap
+            text: overlay.powerPlugin === "io.github.nipsen.dell-power"
+              ? "The charge limit, thermal modes and fans are in Dell Power, on your bar or in the tray drawer."
+              : "The power profile and charge settings are in Omarchy's power panel on your bar."
+            color: overlay.faint
+            font.family: Style.font.family
+            font.pixelSize: Style.font.caption
           }
 
           Text {

@@ -229,12 +229,12 @@ def health(info: dict) -> dict:
 
 
 def capacity_trend(days: list[dict]) -> list[list]:
-    """[date, capacity %] from the daily health log, one point a day, oldest first."""
-    out = []
+    """[date, capacity %] from the daily health log, one point a day (the day's last reading), oldest first."""
+    by_day: dict[str, float] = {}
     for d in days:
         if isinstance(d, dict) and isinstance(d.get("d"), str) and isinstance(d.get("cap"), (int, float)):
-            out.append([d["d"][:10], round(float(d["cap"]), 1)])
-    return out[-400:]
+            by_day[d["d"][:10]] = round(float(d["cap"]), 1)
+    return [[day, by_day[day]] for day in sorted(by_day)][-400:]
 
 
 # ---------------------------------------------------------------- what to tell you
