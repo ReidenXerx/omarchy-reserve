@@ -75,9 +75,28 @@ omarchy plugin remove reidenxerx.reserve
 The sampler stops with it. Your history stays in `~/.local/state/reserve` until
 you delete it.
 
+## On KDE Plasma
+
+Reserve also comes as a Plasma 6 widget, for the panel or the system tray,
+with the same panel drawn in Plasma's own controls and colours. Install it from
+the KDE Store (Add Widgets → Get New Widgets → search "Reserve"), or build it
+here:
+
+```bash
+tools/build-plasma          # dist/reserve.plasmoid
+kpackagetool6 -t Plasma/Applet -i dist/app.duduphudu.reserve
+```
+
+The level and charging state come from Plasma's power management. The widget
+runs the same sampler for as long as Plasma runs, one per user however many
+Reserve widgets you add, and it stops when you remove the widget. It sits
+beside Plasma's Power and Battery widget rather than replacing it: charge
+limits and power profiles stay there.
+
 ## Requirements
 
-Omarchy's Quickshell-based shell, Python 3, and a laptop battery.
+Omarchy's Quickshell-based shell, Python 3, and a laptop battery. On Plasma:
+Plasma 6 and Python 3.
 
 ## Tests
 

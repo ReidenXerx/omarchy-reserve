@@ -142,8 +142,9 @@ def run() -> int:
             sampler.once()
         except (OSError, store.Unsafe) as problem:
             print(f"reserve: {problem}", file=sys.stderr)
-        # Gone with the shell that started it: an orphan would sample for nobody.
-        if os.getppid() != parent:
+        # Gone with the shell that started it: an orphan would sample for nobody. Gone too when Reserve itself was
+        # removed (a Plasma widget's sampler outlives the widget, not Plasma).
+        if os.getppid() != parent or not os.path.exists(__file__):
             break
         # Wake on the minute, so samples line up and a sleep shows as a gap.
         delay = INTERVAL - (time.time() % INTERVAL)

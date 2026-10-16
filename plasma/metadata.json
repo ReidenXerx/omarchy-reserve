@@ -1,0 +1,17 @@
+{
+  "KPackageStructure": "Plasma/Applet",
+  "KPlugin": {
+    "Authors": [{ "Name": "DuduPhudu", "Email": "" }],
+    "Category": "System Information",
+    "Description": "Your battery the way a phone shows it: the day's level with charging and sleep, which apps used the charge, battery health and the charger you plugged in.",
+    "Icon": "battery-good",
+    "Id": "app.duduphudu.reserve",
+    "License": "MIT",
+    "Name": "Reserve",
+    "Version": "1.0.1",
+    "Website": "https://duduphudu.app/plugins/reserve/"
+  },
+  "X-Plasma-API-Minimum-Version": "6.0",
+  "X-Plasma-NotificationArea": "true",
+  "X-Plasma-NotificationAreaCategory": "Hardware"
+}

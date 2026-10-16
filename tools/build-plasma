@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Assemble the Plasma widget: the plasma/ package plus the shared core (the helper and its Python),
+# into dist/app.duduphudu.reserve and dist/reserve.plasmoid.
+set -euo pipefail
+root="$(cd "$(dirname "$0")/.." && pwd)"
+out="$root/dist/app.duduphudu.reserve"
+rm -rf -- "${out:?}" "$root/dist/reserve.plasmoid"
+mkdir -p "$out/contents/code/bin" "$out/contents/code/app"
+cp -r "$root/plasma/." "$out/"
+cp "$root/bin/reserve" "$out/contents/code/bin/"
+cp "$root"/app/*.py "$out/contents/code/app/"
+cp "$root/LICENSE" "$out/" 2>/dev/null || true
+chmod 755 "$out/contents/code/bin/reserve"
+(cd "$out" && /usr/bin/zip -qr "$root/dist/reserve.plasmoid" .)
+echo "$out"
