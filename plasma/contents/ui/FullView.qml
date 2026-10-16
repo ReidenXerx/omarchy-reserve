@@ -38,7 +38,7 @@ PlasmaExtras.Representation {
     var res = view.reserve
     if (!res.present) return "No battery found"
     var cur = view.r ? view.r.current : null
-    if (res.onBattery) {
+    if (res.unplugged) {
       var left = view.r && view.r.timeLeft ? view.r.timeLeft : null
       if (left) return "About " + res.spell(left.hours * 3600) + " left at " + (left.rateMw / 1000).toFixed(1) + " W"
       if (res.timeToEmpty > 0) return "About " + res.spell(res.timeToEmpty) + " left"

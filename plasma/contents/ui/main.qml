@@ -26,7 +26,7 @@ PlasmoidItem {
   readonly property int percent: root.present ? Math.max(0, Math.min(100, Math.round(Number(root.battery["Percent"]) || 0))) : 0
   readonly property string state: String(root.battery["State"] || "")
   readonly property bool pluggedIn: power.data["AC Adapter"] ? power.data["AC Adapter"]["Plugged in"] === true : false
-  readonly property bool onBattery: root.present && !root.pluggedIn
+  readonly property bool unplugged: root.present && !root.pluggedIn
   readonly property bool charging: root.state === "Charging"
   // Seconds; Plasma gives milliseconds, and only while discharging.
   readonly property real timeToEmpty: Number(root.battery["Smoothed Remaining msec"] || root.battery["Remaining msec"] || 0) / 1000
@@ -145,10 +145,10 @@ PlasmoidItem {
   toolTipMainText: root.present ? "Reserve: " + root.percent + "%" : "Reserve: no battery found"
   toolTipSubText: {
     if (!root.present) return ""
-    if (root.onBattery && root.timeToEmpty > 0) return "About " + root.spell(root.timeToEmpty) + " left"
+    if (root.unplugged && root.timeToEmpty > 0) return "About " + root.spell(root.timeToEmpty) + " left"
     if (root.charging) return "Charging"
     if (root.state === "NoCharge") return "Plugged in, held at the charge limit"
-    if (!root.onBattery) return "Plugged in"
+    if (!root.unplugged) return "Plugged in"
     return "On battery"
   }
 
