@@ -11,7 +11,7 @@ import org.kde.plasma.plasma5support as P5Support
 PlasmoidItem {
   id: root
 
-  readonly property string helper: String(Qt.resolvedUrl("../code/bin/reserve")).replace("file://", "")
+  readonly property string helper: decodeURIComponent(String(Qt.resolvedUrl("../code/bin/reserve")).replace("file://", ""))
 
   // ---------------------------------------------------------------- live, from Plasma
 
@@ -59,8 +59,17 @@ PlasmoidItem {
   // widgets share one sampler). One that stops is tried again in half a minute.
   readonly property string samplerCommand: "/usr/bin/python3 -I " + root.quote(root.helper) + " run"
 
+  // One that stops straight away (another holds the lock: a second widget, or the last Plasma's still going) is
+  // tried less and less often, up to every ten minutes, instead of a new Python every half minute.
+  property double samplerStarted: 0
+  property int quickStops: 0
   function startSampler() {
-    root.run(root.samplerCommand, function () { restart.start() })
+    root.samplerStarted = Date.now()
+    root.run(root.samplerCommand, function () {
+      root.quickStops = Date.now() - root.samplerStarted < 20000 ? root.quickStops + 1 : 0
+      restart.interval = Math.min(600000, 30000 * Math.pow(2, Math.min(5, root.quickStops)))
+      restart.start()
+    })
   }
 
   Timer {
@@ -84,7 +93,7 @@ PlasmoidItem {
     root.reporting = true
     root.refreshAgain = false
     // A report that has not answered in ten seconds is stopped by timeout: the panel shows what it had.
-    root.run("/usr/bin/timeout -k 2 10 /usr/bin/python3 -I " + root.quote(root.helper) + " report --since " + root.since,
+    root.run("/usr/bin/timeout -k 2 10 /usr/bin/python3 -I " + root.quote(root.helper) + " report --since " + root.quote(root.since),
              function (code, out) {
       root.reporting = false
       if (out.length > 0 && out.length < 2 * 1024 * 1024) {
