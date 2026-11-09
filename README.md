@@ -1,9 +1,13 @@
 # Reserve
 
+![Reserve: a day of battery drain, charted the way a phone shows it](assets/banner.webp)
+
 The battery screen your phone has, for your [Omarchy](https://omarchy.org)
 laptop: how the day went, which apps used the charge, how long what is left
 will last, how healthy the battery is, and a plain-words reason when it drained
 faster than it should.
+
+![Reserve: the panel with usage by app, battery health and charging](preview.png)
 
 ## What only Reserve does
 
@@ -32,9 +36,9 @@ faster than it should.
 
 ## Using it
 
-Put the widget on your bar: it is a battery icon at your level, with a bolt
-while it charges, so it can stand in for the stock one. Its tooltip has the
-level and the time left; a click opens the panel.
+Put the widget on your bar: its icon is a small usage chart, so it sits beside
+Omarchy's own battery icon without looking like a second battery. Its tooltip
+has the level and the time left; a click opens the panel.
 
 | In the panel | What it shows |
 |---|---|

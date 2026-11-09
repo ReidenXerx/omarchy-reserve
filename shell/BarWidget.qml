@@ -4,8 +4,8 @@ import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
 
-// Reserve in the bar: the battery, at its level in steps of ten, with a bolt while it charges. The tooltip has the
-// level and the time left; a click opens the panel with usage, health and charging.
+// Reserve in the bar: a usage chart, so it sits beside Omarchy's own battery icon without looking like a second one.
+// The tooltip has the level and the time left; a click opens the panel with usage, health and charging.
 BarWidget {
   id: root
   moduleName: "reidenxerx.reserve"
@@ -45,17 +45,9 @@ BarWidget {
     return line + "\nClick for usage, health and charging"
   }
 
-  // md-battery-10 to -90 are U+F007A to U+F0082 and md-battery U+F0079; the charging set is not in order in the font,
-  // so it is listed (all checked in the font's cmap). md-battery-outline U+F008E when there is no battery to show.
-  readonly property var chargingGlyphs: [0xF089C, 0xF0086, 0xF0087, 0xF0088, 0xF089D, 0xF0089, 0xF089E, 0xF008A, 0xF008B, 0xF0085]
-  readonly property bool charging: root.reserve !== null && root.reserve.charging
-  readonly property string glyph: {
-    var r = root.reserve
-    if (!r || !r.present) return String.fromCodePoint(0xF008E)
-    var step = Math.max(1, Math.min(10, Math.round(r.percent / 10)))
-    if (root.charging) return String.fromCodePoint(root.chargingGlyphs[step - 1])
-    return String.fromCodePoint(step === 10 ? 0xF0079 : 0xF007A + step - 1)
-  }
+  // md-chart-donut U+F07AF (checked by name in the font's cmap): what the battery went on, not how full it is.
+  // Omarchy's own power widget shows the charge, so the two sit side by side without looking alike.
+  readonly property string glyph: String.fromCodePoint(0xF07AF)
 
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
